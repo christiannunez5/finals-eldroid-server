@@ -70,12 +70,10 @@ app.post("/login", async (req, res) => {
 app.post("/update/:userId", async (req, res) => {
     const { userId } = req.params;
 
-    const { email } = req.body;
-
     try {
         const updatedUser = await User.findOneAndUpdate(
             { _id: userId },
-            ...req.body,
+            req.body,
             {
                 new: true,
             }
