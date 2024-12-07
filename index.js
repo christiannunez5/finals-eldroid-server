@@ -2,19 +2,13 @@ import express from "express";
 import mongoose from "mongoose";
 import { User } from "./users.js";
 import cors from "cors";
+import { upload } from "./multer.js";
+import cloudinary from "./cloudinary.js";
 
 const app = express();
-app.use(cors());
+app.use(express.json());
 
-app.use(bodyParser.json({ limit: "50mb", extended: true }));
-app.use(
-    bodyParser.urlencoded({
-        limit: "50mb",
-        extended: true,
-        parameterLimit: 50000,
-    })
-);
-app.use(bodyParser.text({ limit: "200mb" }));
+app.use(cors());
 
 app.use((req, res, next) => {
     console.log("METHOD: " + req.method);
@@ -27,27 +21,30 @@ app.get("/", async (req, res) => {
     res.send(users);
 });
 
-app.post("/register", async (req, res) => {
-    const { email, password, image } = req.body;
+app.post("/register", upload.single("image"), async (req, res) => {
+    const { email, password } = req.body;
+    const image = req.file;
 
     try {
         const existingUser = await User.findOne({ email });
         if (existingUser) {
             return res.status(400).json({ error: "User already exist" });
         }
-
+        let imageURL = undefined;
+        if (image) {
+            imageURL = await cloudinary.uploader.upload(image.path);
+        }
         const newUser = new User({
             email: email,
             password: password,
-            image: image ? image : "",
+            image: imageURL ? imageURL.secure_url : "",
         });
-
         await newUser.save();
         return res
             .status(201)
             .json({ message: "User created!", data: newUser });
     } catch (error) {
-        return res.status(400).json({ error: "Error registering" });
+        return res.status(400).json({ error: error.message });
     }
 });
 
@@ -73,20 +70,41 @@ app.post("/login", async (req, res) => {
     }
 });
 
-app.post("/update/:userId", async (req, res) => {
+app.post("/update/:userId", upload.single("image"), async (req, res) => {
     const { userId } = req.params;
-    const { email } = req.body;
+
+    const { email, password } = req.body;
+    const image = req.file;
 
     try {
-        const updatedUser = await User.findOneAndUpdate(
-            { _id: userId },
-            {
-                ...req.body,
-            },
-            {
-                new: true,
+        if (email) {
+            const existingUser = await User.findOne({
+                email,
+            });
+
+            if (existingUser) {
+                return res.status(400).json({ error: "Email already in use" });
             }
-        );
+        }
+
+        let imageURL = undefined;
+
+        if (image) {
+            imageURL = await cloudinary.uploader.upload(image.path, {
+                upload_preset: "your_preset",
+                quality: "auto",
+                format: "auto",
+            });
+        }
+
+        const data = {
+            ...req.body,
+            image: imageURL ? imageURL.secure_url : "",
+        };
+
+        const updatedUser = await User.findOneAndUpdate({ _id: userId }, data, {
+            new: true,
+        });
 
         if (!updatedUser) {
             return res.status(404).json({ error: "User does not exist" });
