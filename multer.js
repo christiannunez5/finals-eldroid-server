@@ -1,30 +1,18 @@
 import multer from "multer";
 import path from "path";
+import { fileURLToPath } from "url";
+import { dirname } from "path";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
 const storage = multer.diskStorage({
-    filename: function (req, file, cb) {
-        cb(null, `${file.originalname}`);
+    destination: (req, file, cb) => {
+        cb(null, path.join(__dirname, "public", "images"));
+    },
+    filename: (req, file, cb) => {
+        cb(null, Date.now() + path.extname(file.originalname));
     },
 });
 
-function fileFilter(req, file, cb) {
-    try {
-        if (file.fieldname === "image") {
-            const ext = path.extname(file.originalname).toLowerCase();
-            if (![".jpg", ".jpeg", ".png"].includes(ext)) {
-                cb(null, false);
-            }
-        }
-
-        if (file.fieldname === "audio") {
-            if (file.mimetype !== "audio/mpeg") {
-                return cb(null, false);
-            }
-        }
-        return cb(null, true);
-    } catch (error) {
-        return cb(error, false);
-    }
-}
-
-export const upload = multer({ storage: storage, fileFilter: fileFilter });
+export const upload = multer({ storage: storage });
