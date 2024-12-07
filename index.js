@@ -71,18 +71,8 @@ app.post("/update/:userId", async (req, res) => {
     const { userId } = req.params;
 
     const { email } = req.body;
-
+    
     try {
-        if (email) {
-            const existingUser = await User.findOne({
-                email,
-            });
-
-            if (existingUser && existingUser._id !== userId) {
-                return res.status(400).json({ error: "Email already in use" });
-            }
-        }
-
         const updatedUser = await User.findOneAndUpdate(
             { _id: userId },
             ...req.body,
