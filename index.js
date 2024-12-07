@@ -78,7 +78,7 @@ app.post("/update/:userId", async (req, res) => {
                 email,
             });
 
-            if (existingUser) {
+            if (existingUser && existingUser._id !== userId) {
                 return res.status(400).json({ error: "Email already in use" });
             }
         }
