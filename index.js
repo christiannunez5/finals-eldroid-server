@@ -21,24 +21,21 @@ app.get("/", async (req, res) => {
     res.send(users);
 });
 
-app.post("/register", upload.single("image"), async (req, res) => {
-    const { email, password } = req.body;
-    const image = req.file;
+app.post("/register", async (req, res) => {
+    const { email, password, image } = req.body;
 
     try {
         const existingUser = await User.findOne({ email });
         if (existingUser) {
             return res.status(400).json({ error: "User already exist" });
         }
-        let imageURL = undefined;
-        if (image) {
-            imageURL = await cloudinary.uploader.upload(image.path);
-        }
+
         const newUser = new User({
             email: email,
             password: password,
-            image: imageURL ? imageURL.secure_url : "",
+            image: image ? image : "",
         });
+
         await newUser.save();
         return res
             .status(201)
@@ -70,11 +67,10 @@ app.post("/login", async (req, res) => {
     }
 });
 
-app.post("/update/:userId", upload.single("image"), async (req, res) => {
+app.post("/update/:userId", async (req, res) => {
     const { userId } = req.params;
 
-    const { email, password } = req.body;
-    const image = req.file;
+    const { email } = req.body;
 
     try {
         if (email) {
@@ -87,24 +83,13 @@ app.post("/update/:userId", upload.single("image"), async (req, res) => {
             }
         }
 
-        let imageURL = undefined;
-
-        if (image) {
-            imageURL = await cloudinary.uploader.upload(image.path, {
-                upload_preset: "your_preset",
-                quality: "auto",
-                format: "auto",
-            });
-        }
-
-        const data = {
+        const updatedUser = await User.findOneAndUpdate(
+            { _id: userId },
             ...req.body,
-            image: imageURL ? imageURL.secure_url : "",
-        };
-
-        const updatedUser = await User.findOneAndUpdate({ _id: userId }, data, {
-            new: true,
-        });
+            {
+                new: true,
+            }
+        );
 
         if (!updatedUser) {
             return res.status(404).json({ error: "User does not exist" });
