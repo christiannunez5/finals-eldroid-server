@@ -71,7 +71,7 @@ app.post("/update/:userId", async (req, res) => {
     const { userId } = req.params;
 
     const { email } = req.body;
-    
+
     try {
         const updatedUser = await User.findOneAndUpdate(
             { _id: userId },
@@ -90,7 +90,7 @@ app.post("/update/:userId", async (req, res) => {
         if (error.code === 11000) {
             return res.status(400).json({ error: "Email already exists" });
         }
-        return res.status(500).json({ error: "Internal server error" });
+        return res.status(500).json({ error: error.message });
     }
 });
 
