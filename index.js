@@ -1,6 +1,6 @@
 import express from "express";
 import mongoose from "mongoose";
-import { User } from "./users.js";
+import User from "./users.js";
 import cors from "cors";
 import { upload } from "./multer.js";
 import { fileURLToPath } from "url";
@@ -24,7 +24,7 @@ app.use((req, res, next) => {
 
 app.get("/", async (req, res) => {
     const users = await User.find();
-    res.send(users);
+    res.status(200).json(users);
 });
 
 app.get("/:id", async (req, res) => {
@@ -89,7 +89,7 @@ app.post("/login", async (req, res) => {
     }
 });
 
-app.post("/update/:userId", upload.single("image"), async (req, res) => {
+app.patch("/update/:userId", upload.single("image"), async (req, res) => {
     const { userId } = req.params;
     const { email, password, removeImage } = req.body;
 

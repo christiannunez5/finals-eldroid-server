@@ -8,8 +8,9 @@ const __dirname = dirname(__filename);
 
 const storage = multer.diskStorage({
     destination: (req, file, cb) => {
+        console.log("Setting destination for file:", file.originalname);
         cb(null, path.join(__dirname, "public", "images"));
-    },
+    },  
     filename: (req, file, cb) => {
         cb(null, Date.now() + path.extname(file.originalname));
     },
