@@ -22,9 +22,11 @@ app.use((req, res, next) => {
     next();
 });
 
+app.get("/favicon.ico", (req, res) => res.status(204).end());
+
 app.get("/", async (req, res) => {
     const users = await User.find();
-    res.status(200).json(users);
+    res.send(users);
 });
 
 app.get("/:id", async (req, res) => {
@@ -41,32 +43,32 @@ app.get("/:id", async (req, res) => {
 
 app.post("/register", upload.single("image"), async (req, res) => {
     const { email, password } = req.body;
-
-    console.log(req.body); // Form fields
+    const image = req.file;
 
     try {
         const existingUser = await User.findOne({ email });
         if (existingUser) {
             return res.status(400).json({ error: "User already exist" });
         }
+        let imageURL = undefined;
 
-        const image = req.file ? `${req.file.filename}` : "";
-
+        if (image) {
+            imageURL = await cloudinary.uploader.upload(image.path);
+        }
         const newUser = new User({
             email: email,
             password: password,
-            image: image,
+            image: image ? image : "",
+            image: imageURL ? imageURL.secure_url : "",
         });
-
         await newUser.save();
         return res
             .status(201)
             .json({ message: "User created!", data: newUser });
     } catch (error) {
-        return res.status(400).json({ error: error.message });
+        return res.status(400).json({ error: "Error registering" });
     }
 });
-
 app.post("/login", async (req, res) => {
     const { email, password } = req.body;
 
@@ -89,39 +91,52 @@ app.post("/login", async (req, res) => {
     }
 });
 
-app.patch("/update/:userId", upload.single("image"), async (req, res) => {
+app.put("/update/:userId", upload.single("image"), async (req, res) => {
     const { userId } = req.params;
-    const { email, password, removeImage } = req.body;
+
+    const { email, password } = req.body;
+    const image = req.file;
 
     try {
-        const user = await User.findOne({ _id: userId });
+        if (email) {
+            const existingUser = await User.findOne({
+                email,
+            });
 
-        if (!user) {
-            return res.status(404).json({ error: "User does not exist" });
+            if (existingUser) {
+                return res.status(400).json({ error: "Email already in use" });
+            }
+        }
+
+        let imageURL = undefined;
+
+        if (image) {
+            imageURL = await cloudinary.uploader.upload(image.path, {
+                upload_preset: "your_preset",
+                quality: "auto",
+                format: "auto",
+            });
         }
 
         const data = {
-            email: email,
-            password: password,
-            image: user.image, // Default to the current image
+            ...req.body,
+            image: imageURL ? imageURL.secure_url : "",
         };
-
-        if (removeImage) {
-            data.image = "";
-        } else if (req.file) {
-            data.image = req.file.filename;
-        }
 
         const updatedUser = await User.findOneAndUpdate({ _id: userId }, data, {
             new: true,
         });
+
+        if (!updatedUser) {
+            return res.status(404).json({ error: "User does not exist" });
+        }
 
         res.status(200).json({ message: "Updated user!", data: updatedUser });
     } catch (error) {
         if (error.code === 11000) {
             return res.status(400).json({ error: "Email already exists" });
         }
-        return res.status(500).json({ error: error.message });
+        return res.status(500).json({ error: "Internal server error" });
     }
 });
 
