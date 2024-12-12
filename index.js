@@ -6,7 +6,7 @@ import { upload } from "./multer.js";
 import { fileURLToPath } from "url";
 import { dirname } from "path";
 import path from "path";
-import cloudinary from "./cloudinary.js";
+import { ngrokListener as startngrok } from "./ngrok.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -23,11 +23,14 @@ app.use((req, res, next) => {
     next();
 });
 
-app.get("/favicon.ico", (req, res) => res.status(204).end());
+const ngrokListener = await startngrok();
 
+app.get("/favicon.ico", (req, res) => {
+    res.end();
+});
 app.get("/", async (req, res) => {
     const users = await User.find();
-    res.send(users);
+    res.status(200).json(users);
 });
 
 app.get("/:id", async (req, res) => {
@@ -44,33 +47,32 @@ app.get("/:id", async (req, res) => {
 
 app.post("/register", upload.single("image"), async (req, res) => {
     const { email, password } = req.body;
-    const image = req.file;
+
+    console.log(req.body); // Form fields
 
     try {
         const existingUser = await User.findOne({ email });
         if (existingUser) {
             return res.status(400).json({ error: "User already exist" });
         }
-        let imageURL = undefined;
 
-        if (image) {
-            imageURL = await cloudinary.uploader.upload(image.path);
-        }
+        const image = req.file ? `${req.file.filename}` : "";
 
         const newUser = new User({
             email: email,
             password: password,
-            image: image ? image : "",
-            image: imageURL ? imageURL.secure_url : "",
+            image: image,
         });
+
         await newUser.save();
         return res
             .status(201)
             .json({ message: "User created!", data: newUser });
     } catch (error) {
-        return res.status(400).json({ error: "Error registering" });
+        return res.status(400).json({ error: error.message });
     }
 });
+
 app.post("/login", async (req, res) => {
     const { email, password } = req.body;
 
@@ -93,48 +95,39 @@ app.post("/login", async (req, res) => {
     }
 });
 
-app.put("/update/:userId", upload.single("image"), async (req, res) => {
+app.patch("/update/:userId", upload.single("image"), async (req, res) => {
     const { userId } = req.params;
-
-    const { email, password } = req.body;
-    const image = req.file;
+    const { email, password, removeImage } = req.body;
 
     try {
-        if (email) {
-            const existingUser = await User.findOne({
-                email,
-            });
+        const user = await User.findOne({ _id: userId });
 
-            if (existingUser) {
-                return res.status(400).json({ error: "Email already in use" });
-            }
-        }
-
-        let imageURL = undefined;
-
-        if (image) {
-            imageURL = await cloudinary.uploader.upload(image.path);
+        if (!user) {
+            return res.status(404).json({ error: "User does not exist" });
         }
 
         const data = {
-            ...req.body,
-            image: imageURL ? imageURL.secure_url : "",
+            email: email,
+            password: password,
+            image: user.image, // Default to the current image
         };
+
+        if (removeImage) {
+            data.image = "";
+        } else if (req.file) {
+            data.image = req.file.filename;
+        }
 
         const updatedUser = await User.findOneAndUpdate({ _id: userId }, data, {
             new: true,
         });
-
-        if (!updatedUser) {
-            return res.status(404).json({ error: "User does not exist" });
-        }
 
         res.status(200).json({ message: "Updated user!", data: updatedUser });
     } catch (error) {
         if (error.code === 11000) {
             return res.status(400).json({ error: "Email already exists" });
         }
-        return res.status(500).json({ error: "Internal server error" });
+        return res.status(500).json({ error: error.message });
     }
 });
 
@@ -146,6 +139,8 @@ mongoose
     .then(() => {
         app.listen(8080, () => {
             console.log("listening on port " + 8080);
+            ngrokListener.forward(`localhost:8080`);
+            console.log("Ingress established at:", ngrokListener.url());
         });
     })
     .catch((err) => {
