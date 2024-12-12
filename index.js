@@ -6,6 +6,7 @@ import { upload } from "./multer.js";
 import { fileURLToPath } from "url";
 import { dirname } from "path";
 import path from "path";
+import cloudinary from "./cloudinary.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -55,6 +56,7 @@ app.post("/register", upload.single("image"), async (req, res) => {
         if (image) {
             imageURL = await cloudinary.uploader.upload(image.path);
         }
+
         const newUser = new User({
             email: email,
             password: password,
@@ -111,11 +113,7 @@ app.put("/update/:userId", upload.single("image"), async (req, res) => {
         let imageURL = undefined;
 
         if (image) {
-            imageURL = await cloudinary.uploader.upload(image.path, {
-                upload_preset: "your_preset",
-                quality: "auto",
-                format: "auto",
-            });
+            imageURL = await cloudinary.uploader.upload(image.path);
         }
 
         const data = {
